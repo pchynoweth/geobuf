@@ -1,48 +1,37 @@
 #!/usr/bin/env node
 
-var encode = require('../encode'),
-    Pbf = require('pbf'),
-    shapefile = require('shapefile'),
-    fs = require('fs'),
-    path = require('path');
+const encode = require('../encode');
+const Pbf = require('pbf');
+const shapefile = require('shapefile');
+const fs = require('fs');
+const path = require('path');
 
+const shp_path = process.argv[2];
 
-var shp_path = process.argv[2];
-
-var dbf_path = process.argv[3] === undefined ?
+let dbf_path = process.argv[3] === undefined ?
                path.dirname(shp_path) + '/' + path.basename(shp_path, '.shp') + '.dbf'
                : process.argv[3];
-var shp_name = path.basename(shp_path);
-var dbf_name = path.basename(dbf_path);
-var dbf_exists = true;
+const shp_name = path.basename(shp_path);
+const dbf_name = path.basename(dbf_path);
 
-fs.access(shp_path, fs.F_OK, (err) => {
-  if (err) {
-    console.error('File %s does not exist!', shp_path);
-    process.exit(1);
-  }
+try {
+  fs.accessSync(shp_path, fs.F_OK);
+}
+catch (err) {
+  console.error('File %s does not exist!', shp_path);
+  process.exit(1);
+}
+
+try {
+  // Check for associated dbf file
+  fs.accessSync(dbf_path, fs.F_OK);
+}
+catch {
+  dbf_path = undefined;
+}
+
+shapefile.read(shp_path, dbf_path).then(function(geojson){
+  const geobuf = encode(geojson, new Pbf());
+  const output_buffer = Buffer.allocUnsafe ? Buffer.from(geobuf) : new Buffer(geobuf);
+  process.stdout.write(output_buffer);
 });
-
-// Check for associated dbf file
-fs.access(dbf_path, fs.F_OK, (err) => {
-  if (err) {
-    dbf_exists = false;
-  }
-})
-  
-
-if(dbf_exists === true)
-{
-    shapefile.read(shp_path, dbf_path).then(function(geojson){
-    var geobuf = encode(geojson, new Pbf());
-    var output_buffer = Buffer.allocUnsafe ? Buffer.from(geobuf) : new Buffer(geobuf);
-    process.stdout.write(output_buffer);
-    });
-}
-else
-{
-    shapefile.read(shp_path).then(function(geojson){
-    var geobuf = encode(geojson, new Pbf());
-    var output_buffer = Buffer.allocUnsafe ? Buffer.from(geobuf) : new Buffer(geobuf);
-    process.stdout.write(output_buffer);
-}
